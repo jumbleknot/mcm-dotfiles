@@ -59,9 +59,16 @@ else
 fi
 
 # Activate the RTK Claude Code hook (idempotent; writes into the persisted ~/.claude).
+# Without --auto-patch, `rtk init -g` PROMPTS before editing settings.json, and a non-interactive
+# run answers NO — it then exits 0 having wired nothing. So patch explicitly, and VERIFY the hook
+# landed rather than trusting the exit code.
 if command -v rtk >/dev/null 2>&1; then
-  rtk init -g >/dev/null 2>&1 || log "WARN: 'rtk init -g' returned non-zero (already initialized?)."
-  log "RTK active — verify with: rtk gain"
+  rtk init -g --auto-patch || log "WARN: 'rtk init -g --auto-patch' returned non-zero."
+  if grep -qs 'rtk hook' "${CLAUDE_DIR}/settings.json"; then
+    log "RTK active — PreToolUse hook present in ${CLAUDE_DIR}/settings.json"
+  else
+    die "RTK built but its hook is NOT in ${CLAUDE_DIR}/settings.json — run 'rtk init -g --auto-patch' (FR-015)"
+  fi
 fi
 
 # --- 2. Personal Claude Code marketplaces + plugins (guarded — persist in ~/.claude) ------
@@ -76,7 +83,7 @@ PERSONAL_MARKETPLACES=(
   "Codeblockz/langchain-community-plugin"
 )
 
-# All 15 plugins as name@marketplace (exact refs mirrored from the host workstation set).
+# All 14 plugins as name@marketplace (exact refs mirrored from the host workstation set).
 PERSONAL_PLUGINS=(
   "superpowers@claude-plugins-official"
   "expo@claude-plugins-official"
@@ -87,8 +94,9 @@ PERSONAL_PLUGINS=(
   "rust-analyzer-lsp@claude-plugins-official"
   "pyright-lsp@claude-plugins-official"
   "pydantic-ai@claude-plugins-official"
-  "react-native-best-practices@callstack-agent-skills"
-  "upgrading-react-native@callstack-agent-skills"
+  # Callstack restructured into bundles on 2026-08-07 (agent-skills #74); both skills used here
+  # (react-native-best-practices, upgrading-react-native) now live in this one plugin.
+  "building-react-native-apps@callstack-agent-skills"
   "nx@nx-claude-plugins"
   "rust-skills@rust-skills"
   "langsmith-tracing@langsmith-claude-code-plugins"
@@ -101,17 +109,25 @@ if command -v claude >/dev/null 2>&1; then
     claude plugin marketplace add "${m}" >/dev/null 2>&1 \
       || log "note: marketplace add for ${m} returned non-zero (already registered?) — continuing."
   done
+  # `marketplace add` does not refresh one that is already registered, so a reused ~/.claude volume
+  # keeps a stale catalogue and cannot see an upstream rename. Refresh before installing.
+  claude plugin marketplace update >/dev/null 2>&1 \
+    || log "note: marketplace update returned non-zero — installing from the cached catalogues."
 
+  failed=()
   for p in "${PERSONAL_PLUGINS[@]}"; do
     name="${p%@*}"
     if claude plugin list 2>/dev/null | grep -qF "${name}"; then
       log "plugin already installed: ${p} (skip)"
     else
       log "installing plugin: ${p}"
-      claude plugin install "${p}" --scope user \
-        || die "plugin install failed for '${p}' — is its marketplace (GitHub) reachable through the firewall? (FR-015)"
+      claude plugin install "${p}" --scope user || failed+=("${p}")
     fi
   done
+  # Still fail loud (FR-015), but only after trying EVERY plugin: one renamed upstream plugin must
+  # not silently skip the rest. "not found in marketplace" = renamed; a network error = firewall.
+  [ "${#failed[@]}" -eq 0 ] \
+    || die "plugin install failed for: ${failed[*]} — renamed upstream, or marketplace unreachable? (FR-015)"
 else
   log "claude CLI not found — skipping plugin install (unexpected; the image bakes Claude Code)."
 fi
