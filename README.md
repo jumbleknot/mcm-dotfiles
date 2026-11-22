@@ -33,4 +33,7 @@ inside the container.
 ## Customize
 
 - `RTK_GIT_URL` (top of `install.sh`) — the RTK source repo to build from.
+- `RTK_VERSION` — the pinned RTK release tag (without the `v`). Bump it to upgrade: the next
+  container open sees the installed version differs and rebuilds. Use a stable tag at least two
+  weeks old, never a `dev-*-rc` prerelease.
 - `PERSONAL_PLUGINS` / `PERSONAL_MARKETPLACES` arrays — your plugin set.

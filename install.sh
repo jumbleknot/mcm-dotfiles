@@ -47,15 +47,25 @@ fi
 
 # --- 1. RTK (Rust Token Killer) — cargo install --git into the persisted volume -----------
 RTK_GIT_URL="${RTK_GIT_URL:-https://github.com/rtk-ai/rtk.git}"
-if command -v rtk >/dev/null 2>&1 && [ -x "${RTK_BIN}/rtk" ]; then
-  log "RTK already installed ($(command -v rtk)) — skipping build (FR-008 idempotent)."
+# PINNED to a release tag. An unpinned `cargo install --git` builds whatever the default branch is on
+# the day of the FIRST build, and the "already installed" guard below then keeps that binary on the
+# persisted volume for ever — the sandbox ran a July build into November. Bump this to upgrade; the
+# next container open rebuilds because the installed version no longer matches. Pick a stable tag
+# (not a dev-*-rc prerelease) at least two weeks old.
+RTK_VERSION="${RTK_VERSION:-1.2.0}"
+installed_rtk=''
+[ -x "${RTK_BIN}/rtk" ] && installed_rtk="$("${RTK_BIN}/rtk" --version 2>/dev/null | awk '{print $2}')"
+if [ "${installed_rtk}" = "${RTK_VERSION}" ]; then
+  log "RTK ${RTK_VERSION} already installed (${RTK_BIN}/rtk) — skipping build (FR-008 idempotent)."
 else
   command -v cargo >/dev/null 2>&1 || die "cargo not found — the toolchain image is required for RTK (FR-015)."
-  log "building RTK from ${RTK_GIT_URL} into ${RTK_ROOT} (one-time; cached by the cargo volumes)…"
-  if ! cargo install --git "${RTK_GIT_URL}" --root "${RTK_ROOT}" rtk; then
+  log "building RTK v${RTK_VERSION} from ${RTK_GIT_URL} into ${RTK_ROOT} (installed: ${installed_rtk:-none})…"
+  if ! cargo install --locked --force --git "${RTK_GIT_URL}" --tag "v${RTK_VERSION}" --root "${RTK_ROOT}" rtk; then
     die "RTK build failed — is crates.io / ${RTK_GIT_URL} reachable through the egress firewall? (FR-015)"
   fi
-  log "RTK built → ${RTK_BIN}/rtk"
+  got_rtk="$("${RTK_BIN}/rtk" --version 2>/dev/null | awk '{print $2}')"
+  [ "${got_rtk}" = "${RTK_VERSION}" ] || die "RTK built but reports '${got_rtk:-nothing}', expected ${RTK_VERSION} (FR-015)"
+  log "RTK ${got_rtk} built → ${RTK_BIN}/rtk"
 fi
 
 # Activate the RTK Claude Code hook (idempotent; writes into the persisted ~/.claude).
