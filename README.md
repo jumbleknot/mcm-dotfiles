@@ -12,7 +12,7 @@ idempotently:
 
 1. Builds **RTK** (Rust Token Killer) from source into the persisted `~/.claude/tools` volume and
    runs `rtk init -g`.
-2. Registers 6 Claude Code marketplaces and installs 14 personal plugins/skills (guarded — skips
+2. Registers 5 Claude Code marketplaces and installs 13 personal plugins/skills (guarded — skips
    anything already present on the persisted `~/.claude` volume).
 3. Leaves service logins (Claude / gh / Expo) to the persisted `~/.claude` volume.
 

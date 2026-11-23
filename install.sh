@@ -91,13 +91,12 @@ fi
 PERSONAL_MARKETPLACES=(
   "anthropics/claude-plugins-official"
   "callstackincubator/agent-skills"
-  "nrwl/nx-ai-agents-config"
   "actionbook/rust-skills"
   "langchain-ai/langsmith-claude-code-plugins"
   "Codeblockz/langchain-community-plugin"
 )
 
-# All 14 plugins as name@marketplace (exact refs mirrored from the host workstation set).
+# All 13 plugins as name@marketplace (exact refs mirrored from the host workstation set).
 PERSONAL_PLUGINS=(
   "superpowers@claude-plugins-official"
   "expo@claude-plugins-official"
@@ -111,13 +110,33 @@ PERSONAL_PLUGINS=(
   # Callstack restructured into bundles on 2026-08-07 (agent-skills #74); both skills used here
   # (react-native-best-practices, upgrading-react-native) now live in this one plugin.
   "building-react-native-apps@callstack-agent-skills"
-  "nx@nx-claude-plugins"
   "rust-skills@rust-skills"
   "langsmith-tracing@langsmith-claude-code-plugins"
   "langchain-community@langchain-community-marketplace"
 )
 
+# Retired: removed from the lists above, and UNINSTALLED here, because a reused ~/.claude volume
+# keeps whatever an earlier run installed — dropping a name from PERSONAL_PLUGINS alone changes
+# nothing for an existing environment. Entries are "plugin@marketplace|marketplace-name".
+# nx (2026-11-23): unused in this workspace — 0 invocations across 73 sessions — and its
+# marketplace was tracked unpinned; MovieCollectionManager removed its project-scope copy in PR #1102.
+RETIRED_PLUGINS=(
+  "nx@nx-claude-plugins|nx-claude-plugins"
+)
+
 if command -v claude >/dev/null 2>&1; then
+  for r in "${RETIRED_PLUGINS[@]}"; do
+    p="${r%%|*}"; mkt="${r##*|}"
+    if claude plugin list 2>/dev/null | grep -qF "${p}"; then
+      log "uninstalling retired plugin: ${p}"
+      claude plugin uninstall "${p}" --scope user >/dev/null 2>&1         || log "note: uninstall of ${p} returned non-zero — continuing."
+    fi
+    if claude plugin marketplace list 2>/dev/null | grep -qF "${mkt}"; then
+      log "removing retired marketplace: ${mkt}"
+      claude plugin marketplace remove "${mkt}" >/dev/null 2>&1         || log "note: marketplace remove for ${mkt} returned non-zero — continuing."
+    fi
+  done
+
   for m in "${PERSONAL_MARKETPLACES[@]}"; do
     log "registering marketplace: ${m}"
     claude plugin marketplace add "${m}" >/dev/null 2>&1 \
