@@ -24,9 +24,13 @@ set -uo pipefail
 log()  { printf '[dotfiles] %s\n' "$1"; }
 die()  { printf '[dotfiles] ERROR: %s\n' "$1" >&2; exit 1; }
 
-# --- 0. sanity: only meaningful inside the dev container ----------------------------------
-if [ "${MCM_DEVCONTAINER:-}" != "1" ]; then
-  log "not inside the MCM dev container (MCM_DEVCONTAINER != 1) — skipping personal bootstrap."
+# --- 0. sanity: only meaningful inside a dev container that asks for the personal layer ---
+# Two markers are accepted: MCM_DEVCONTAINER=1 (MovieCollectionManager, unchanged) and the
+# neutral DEVCONTAINER_PERSONAL_LAYER=1, which any other repository's dev container sets
+# (BELAY sets it). Neither set: skip and exit 0, as before. Outside a dev container this
+# script must do nothing.
+if [ "${MCM_DEVCONTAINER:-}" != "1" ] && [ "${DEVCONTAINER_PERSONAL_LAYER:-}" != "1" ]; then
+  log "not inside a dev container that requests the personal layer (neither MCM_DEVCONTAINER=1 nor DEVCONTAINER_PERSONAL_LAYER=1) — skipping personal bootstrap."
   exit 0
 fi
 

@@ -19,6 +19,11 @@ idempotently:
 It fails loud (non-zero) if a required source is unreachable through the container's egress
 firewall, and no-ops cleanly outside the dev container.
 
+It runs only when the container sets one of two markers: `MCM_DEVCONTAINER=1` (the
+MovieCollectionManager dev container) or the neutral `DEVCONTAINER_PERSONAL_LAYER=1`, which any
+other repository's dev container can set (BELAY's does). With neither set, it logs a skip and
+exits 0.
+
 ## Wire it in
 
 VS Code **User** settings (not the committed devcontainer.json):
